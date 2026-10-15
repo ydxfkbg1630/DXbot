@@ -1,0 +1,56 @@
+{
+  "name": "@agent-wechat/wechat",
+  "version": "0.11.9",
+  "type": "module",
+  "files": [
+    "dist",
+    "openclaw.plugin.json"
+  ],
+  "scripts": {
+    "build": "esbuild index.ts --bundle --format=esm --platform=node --outfile=dist/index.js --external:openclaw --external:sharp",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types src/*.test.ts"
+  },
+  "devDependencies": {
+    "@agent-wechat/shared": "workspace:*",
+    "@types/node": "^22",
+    "esbuild": "^0.25.0",
+    "openclaw": ">=2026.3.2 <2027.0.0",
+    "typescript": "^5.4.5"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wechat",
+      "label": "WeChat",
+      "selectionLabel": "WeChat (微信)",
+      "aliases": [
+        "weixin"
+      ],
+      "order": 80
+    },
+    "install": {
+      "npmSpec": "@agent-wechat/wechat"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thisnick/agent-wechat.git",
+    "directory": "packages/openclaw-extension"
+  },
+  "description": "OpenClaw channel plugin for WeChat. Connects your OpenClaw bot to WeChat using [agent-wechat](https://github.com/thisnick/agent-wechat).",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/thisnick/agent-wechat/issues"
+  },
+  "homepage": "https://github.com/thisnick/agent-wechat#readme"
+}

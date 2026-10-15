@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Shared script to launch WeChat with the correct environment.
+# Called by both entrypoint.sh (initial launch) and agent-server (restart after crash).
+#
+# Required env vars: DISPLAY, DBUS_SESSION_BUS_ADDRESS
+# Optional env vars: WECHAT_HOME (defaults to /home/wechat)
+#
+# ---------------------------------------------------------------------------
+# Headless-container notes (this deployment)
+#
+# 1) GPU: the container has no GPU. WeChat's login QR is a canvas element and
+#    renders completely blank unless the GL fallback works, so we force the
+#    swiftshader software path. Requires libegl1 / libgles2 / libgl1-mesa-dri
+#    inside the image.
+#
+# 2) Repaint kick: even with the QR drawn, the Electron client leaves it stuck
+#    at partial opacity (its fade-in animation never completes because the
+#    software compositor does not tick it). Resizing the window once after the
+#    window appears forces the repaint and the QR becomes fully opaque and
+#    scannable. This is why the QR "looks expired/blank" without the kick.
+# ---------------------------------------------------------------------------
+
+set -euo pipefail
+
+WECHAT_HOME="${WECHAT_HOME:-/home/wechat}"
+WECHAT_USER="${WECHAT_USER:-wechat}"
+
+export LIBGL_ALWAYS_SOFTWARE=1
+
+su -s /bin/bash -c "DISPLAY=$DISPLAY \
+  DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-} \
+  QT_ACCESSIBILITY=1 \
+  QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 \
+  QT_AUTO_SCREEN_SCALE_FACTOR=0 \
+  QT_ENABLE_HIGHDPI_SCALING=0 \
+  QT_SCALE_FACTOR=1 \
+  GTK_MODULES=gail:atk-bridge \
+  HOME=$WECHAT_HOME \
+  LIBGL_ALWAYS_SOFTWARE=1 \
+  /usr/bin/wechat --disable-gpu --use-gl=swiftshader --disable-gpu-compositing" "$WECHAT_USER" &
+WECHAT_PID=$!
+
+# --- repaint kick (background, best effort) ---
+(
+  export DISPLAY="${DISPLAY:-:99}"
+  for _ in $(seq 1 60); do
+    sleep 2
+    WID="$(xdotool search --name Weixin 2>/dev/null | head -1 || true)"
+    if [ -n "${WID:-}" ]; then
+      xdotool windowsize "$WID" 620 620 2>/dev/null || true
+      sleep 1
+      xdotool windowsize "$WID" 560 660 2>/dev/null || true
+      sleep 1
+      xdotool windowmove "$WID" 360 70 2>/dev/null || true
+      logger -t launch-wechat "repaint kick applied to window $WID" 2>/dev/null || true
+      break
+    fi
+  done
+) &
+
+wait "$WECHAT_PID"

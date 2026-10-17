@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "WeChat automation via deterministic FSM",
   "private": true,
+  "license": "SEE LICENSE IN LICENSING.md",
   "type": "module",
   "scripts": {
     "build": "turbo run build",

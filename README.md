@@ -4,6 +4,8 @@ DXbot 是一个面向服务器部署的微信、抖音自动回复与 OpenClaw �
 
 本仓库同步自服务器上的实际运行项目，包含微信消息与媒体链路、OpenClaw 微信扩展、历史上下文和回复可靠性模块，以及抖音私信文本自动回复适配。当前同步日期：2026-10-17。
 
+**许可范围：** DXbot 原创贡献采用 **AGPL-3.0-only**；抖音目录采用 **PolyForm Noncommercial 1.0.0**；微信继承代码的授权范围以原作者明确授予的条款为准。完整说明见 [LICENSING.md](LICENSING.md) 和[第三方声明](THIRD_PARTY_NOTICES.md)。
+
 ## 平台入口
 
 | 平台 | 接入方式 | 文档 |
@@ -338,10 +340,19 @@ DXbot 基于 `agent-wechat` 的微信自动化能力扩展而来，保留原项�
 
 ## 贡献
 
-欢迎提交 Issue、Pull Request、测试用例和文档改进。提交前请运行构建、类型检查和相关测试，并在描述中说明验证命令和运行环境。
+欢迎提交 Issue、Pull Request、测试用例和文档改进。提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，运行构建、类型检查和相关测试，并在描述中说明验证命令和运行环境。
 
 ## 许可证说明
 
-各组件沿用对应目录的 `package.json`、`Cargo.toml` 和上游项目许可条款。使用或再发布前，请根据具体组件检查适用许可。
+Copyright (c) 2026 **ydxfkbg1630**，限 DXbot 原创贡献。上游作者和其他贡献者保留其各自作品的版权。
 
-抖音适配目录随附 [PolyForm Noncommercial License 1.0.0 许可声明](integrations/douyin/LICENSE)及上游版权署名，适用用途以该许可证为准。
+| 范围 | 许可与权利来源 |
+|------|----------------|
+| DXbot 维护者有权授权的原创代码、原创修改和原创文档 | [GNU AGPL v3，仅版本 3](LICENSE)，SPDX：`AGPL-3.0-only` |
+| `integrations/douyin/`，含发送引擎及桥接 | 维持该目录的 [PolyForm Noncommercial 1.0.0](integrations/douyin/LICENSE) 及[来源声明](integrations/douyin/NOTICE.md) |
+| 继承自 `thisnick/agent-wechat` 的代码和修改文件中的上游部分 | 保留原作者权利；完整授权依据按[第三方声明](THIRD_PARTY_NOTICES.md)核实 |
+| 第三方依赖、镜像组件、客户端和素材 | 各权利人提供的适用条款 |
+
+AGPL 覆盖部分允许按条款使用、修改和商业分发，要求保留版权和许可证，分发修改版时标注修改并提供相应源码。修改版通过网络与用户交互时，应按第 13 条向相关用户提供该版本完整对应源码的获取入口。抖音目录的使用范围按其非商业许可另行判断。
+
+完整许可范围、既有版本授权和源码交付说明见 [LICENSING.md](LICENSING.md)。署名信息见 [NOTICE.md](NOTICE.md)，项目名称和标识的使用说明见 [BRANDING.md](BRANDING.md)。

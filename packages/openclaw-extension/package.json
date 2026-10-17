@@ -4,7 +4,9 @@
   "type": "module",
   "files": [
     "dist",
-    "openclaw.plugin.json"
+    "openclaw.plugin.json",
+    "LICENSE",
+    "LICENSING.md"
   ],
   "scripts": {
     "build": "esbuild index.ts --bundle --format=esm --platform=node --outfile=dist/index.js --external:openclaw --external:sharp",
@@ -48,7 +50,7 @@
   "main": "index.js",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "SEE LICENSE IN LICENSING.md",
   "bugs": {
     "url": "https://github.com/thisnick/agent-wechat/issues"
   },

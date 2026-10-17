@@ -50,7 +50,11 @@ fn find_edit_and_send_button(a11y: &A11yNode) -> Option<(&A11yNode, &A11yNode)> 
         .filter(|n| n.bounds.is_some())
         .filter(|n| {
             let b = n.bounds.as_ref().unwrap();
-            b.y >= 620.0 && b.y <= send_bounds.y && b.x <= send_bounds.x
+            b.width >= 200.0
+                && b.height >= 40.0
+                && b.y < send_bounds.y
+                && b.x <= send_bounds.x
+                && b.y + b.height >= send_bounds.y - 140.0
         })
         .min_by(|a, b| {
             let ab = a.bounds.as_ref().unwrap();
@@ -74,7 +78,7 @@ fn collect_edit_and_send_nodes<'a>(node: &'a A11yNode, edits: &mut Vec<&'a A11yN
         edits.push(node);
     }
 
-    if node.role == "push-button" && node.name == "Send(S)" {
+    if node.role == "push-button" && matches!(node.name.as_str(), "Send(S)" | "Send") {
         sends.push(node);
     }
 

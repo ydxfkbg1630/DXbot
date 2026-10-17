@@ -2,6 +2,7 @@ import type { ChannelPlugin, ChannelMeta } from "openclaw/plugin-sdk";
 import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { ResolvedWeChatAccount } from "./types.js";
 import { resolveWeChatAccount } from "./types.js";
+import { loadWechatMedia } from "./wechat-media.js";
 import { getWeChatRuntime } from "./runtime.js";
 import { startWeChatMonitor } from "./monitor.js";
 import { wechatOnboardingAdapter } from "./onboarding.js";
@@ -189,30 +190,7 @@ export const wechatPlugin: ChannelPlugin<ResolvedWeChatAccount> = {
       }
       const client = new WeChatClient({ baseUrl: account.serverUrl, token: account.token });
       if (mediaUrl) {
-        const fsmod = await import("fs/promises");
-        const pathmod = await import("path");
-
-        let base64: string;
-        let mimeType: string;
-        let filename: string;
-        if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
-          const res = await fetch(mediaUrl);
-          const buffer = await res.arrayBuffer();
-          base64 = Buffer.from(buffer).toString("base64");
-          mimeType = res.headers.get("content-type") ?? "application/octet-stream";
-          const urlPath = new URL(mediaUrl).pathname;
-          filename = pathmod.basename(urlPath) || "file";
-        } else {
-          const buf = await fsmod.readFile(mediaUrl);
-          base64 = buf.toString("base64");
-          filename = pathmod.basename(mediaUrl);
-          const ext = pathmod.extname(mediaUrl).toLowerCase().replace(".", "");
-          const extMime: Record<string, string> = {
-            png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
-            gif: "image/gif", webp: "image/webp",
-          };
-          mimeType = extMime[ext] ?? "application/octet-stream";
-        }
+          const { base64, filename, mimeType } = await loadWechatMedia(mediaUrl);
 
         const isImage = mimeType.startsWith("image/");
         const result = isImage

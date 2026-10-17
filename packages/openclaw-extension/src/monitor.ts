@@ -14,7 +14,25 @@ import {
   resolveWeChatPolicyContext,
   type WeChatPolicyContext,
 } from "./access-control.js";
-import { prefixWechatReply } from "./reply-prefix.js";
+import { buildMessageFallback } from "./message-fallback.js";
+import { shouldPollWeChatChat } from "./poll-gate.js";
+import { sendWechatReplyLines } from "./reply-sender.js";
+import { buildWeChatHistoryContext } from "./wechat-history-context.js";
+import { loadWechatMedia } from "./wechat-media.js";
+import { labelWeChatMessage } from "./wechat-sender-label.js";
+import {
+  ReplyWatchdogTimeoutError,
+  runWithReplyWatchdog,
+} from "./reply-watchdog.js";
+import {
+  buildChatMessageKey,
+  getEffectivePreviousLastSeen,
+  hasUnreadChatChanged,
+  isRobotMessagePreview,
+  scheduleMessageGapRetry,
+  shouldThrottleMessageGap,
+  type PendingMessageGap,
+} from "./message-watermark.js";
 
 // Message types that may have downloadable media
 const MEDIA_TYPES = new Set([3, 34, 43, 47]); // image, voice, video, emoji
@@ -165,6 +183,9 @@ export async function startWeChatMonitor(
   const lastSeenFile =
     process.env.WECHAT_LAST_SEEN_FILE ||
     "/data/agent-wechat/home/.openclaw/wechat-last-seen.json";
+  const lastSeenMessageFile =
+    process.env.WECHAT_LAST_SEEN_MESSAGE_FILE ||
+    "/data/agent-wechat/home/.openclaw/wechat-last-seen-message.json";
   const loadLastSeen = (): void => {
     try {
       const saved: unknown = JSON.parse(fs.readFileSync(lastSeenFile, "utf8"));
@@ -202,10 +223,47 @@ export async function startWeChatMonitor(
       );
     }
   };
+  const lastSeenMessageKey = new Map<string, string>();
+  const loadLastSeenMessageKeys = (): void => {
+    try {
+      if (!fs.existsSync(lastSeenMessageFile)) return;
+      const saved: unknown = JSON.parse(fs.readFileSync(lastSeenMessageFile, "utf8"));
+      if (saved === null || typeof saved !== "object" || Array.isArray(saved)) {
+        throw new Error("Message watermark JSON must be an object");
+      }
+      for (const [chatId, value] of Object.entries(saved)) {
+        if (typeof value === "string" && value.length > 0) {
+          lastSeenMessageKey.set(chatId, value);
+        }
+      }
+    } catch (err) {
+      log?.error?.(
+        `[wechat:${account.accountId}] Message watermark read error (${lastSeenMessageFile}): ${String(err)}`,
+      );
+    }
+  };
+  let lastWrittenMessageKeys = "";
+  const saveLastSeenMessageKeys = (): void => {
+    try {
+      const serialized = JSON.stringify(Object.fromEntries(lastSeenMessageKey));
+      if (serialized === lastWrittenMessageKeys) return;
+      const tmpPath = `${lastSeenMessageFile}.tmp`;
+      fs.writeFileSync(tmpPath, serialized, "utf8");
+      fs.renameSync(tmpPath, lastSeenMessageFile);
+      lastWrittenMessageKeys = serialized;
+    } catch (err) {
+      log?.error?.(
+        `[wechat:${account.accountId}] Message watermark write error (${lastSeenMessageFile}): ${String(err)}`,
+      );
+    }
+  };
   loadLastSeen();
+  loadLastSeenMessageKeys();
 
   // Buffer non-mentioned group messages for catch-up context
   const groupHistory = new Map<string, ProcessedMessage[]>();
+  const fallbackSeenId = new Map<string, number>();
+  const pendingMessageGaps = new Map<string, PendingMessageGap>();
   const GROUP_HISTORY_LIMIT = 50;
   const lastProbe = new Map<string, number>();
   const catchUpProbe = new Map<string, { localId: number; at: number; delayMs: number }>();
@@ -227,6 +285,8 @@ export async function startWeChatMonitor(
     try {
       // Reload config each iteration so hot-reloads take effect
       const cfg = getWeChatRuntime().config.loadConfig();
+      const pollAccount =
+        resolveWeChatAccount(cfg as Record<string, unknown>, account.accountId) ?? account;
 
       // ---- Auth polling (every authPollIntervalMs) ----
       const now = Date.now();
@@ -294,7 +354,18 @@ export async function startWeChatMonitor(
       // lastMsgLocalId is then the reliable catch-up signal.
       for (const chat of chats) {
         const chatId = chat.username ?? chat.id;
-        if (isOfficialAccount(chatId) || chat.unreadCount > 0) continue;
+        if (!shouldPollWeChatChat(chat, pollAccount)) {
+          if (chat.lastMsgLocalId) lastSeenId.set(chatId, chat.lastMsgLocalId);
+          continue;
+        }
+        if (isRobotMessagePreview(chat)) {
+          if (chat.lastMsgLocalId) lastSeenId.set(chatId, chat.lastMsgLocalId);
+          const messageKey = buildChatMessageKey(chat);
+          if (messageKey) lastSeenMessageKey.set(chatId, messageKey);
+          pendingMessageGaps.delete(chatId);
+          continue;
+        }
+        if (chat.unreadCount > 0) continue;
         if (!lastSeenId.has(chatId) && chat.lastMsgLocalId) {
           lastSeenId.set(chatId, chat.lastMsgLocalId);
         }
@@ -304,10 +375,30 @@ export async function startWeChatMonitor(
       const unreadChats = chats.filter(
         (c) => {
           const id = c.username ?? c.id;
-          if (c.unreadCount <= 0 || isOfficialAccount(id) || workQueue.has(id)) return false;
+          if (!shouldPollWeChatChat(c, pollAccount) || c.unreadCount <= 0 || workQueue.has(id)) return false;
+          const nowForChat = Date.now();
+          if (shouldThrottleMessageGap(c, pendingMessageGaps.get(id), nowForChat)) {
+            return false;
+          }
           const seen = lastSeenId.get(id);
+          const fallbackDone = fallbackSeenId.get(id) === c.lastMsgLocalId;
+          const messageChanged = hasUnreadChatChanged(
+            c,
+            seen,
+            lastSeenMessageKey.get(id),
+          );
+          if (
+            fallbackDone &&
+            c.lastMsgLocalId !== undefined &&
+            c.lastMsgLocalId <= (seen ?? 0) &&
+            !messageChanged
+          ) {
+            return false;
+          }
           return seen === undefined || !c.lastMsgLocalId ||
-            c.lastMsgLocalId > seen || now - (lastProbe.get(id) ?? 0) >= 10_000;
+            c.lastMsgLocalId > seen ||
+            messageChanged ||
+            (!fallbackDone && now - (lastProbe.get(id) ?? 0) >= 10_000);
         },
       );
 
@@ -316,12 +407,19 @@ export async function startWeChatMonitor(
         lastProbe.set(id, now);
         const accepted = workQueue.enqueue(id, async () => {
           try {
-            await processUnreadChat(
+            const handled = await processUnreadChat(
               client, chat, lastSeenId, account, getWeChatRuntime().config.loadConfig(), log, true,
-              groupHistory, GROUP_HISTORY_LIMIT,
+              groupHistory, GROUP_HISTORY_LIMIT, fallbackSeenId,
+              lastSeenMessageKey, pendingMessageGaps,
             );
+            if (handled) {
+              const messageKey = buildChatMessageKey(chat);
+              if (messageKey) lastSeenMessageKey.set(id, messageKey);
+              pendingMessageGaps.delete(id);
+            }
           } finally {
             saveLastSeen();
+            saveLastSeenMessageKeys();
           }
         });
         if (!accepted) {
@@ -340,8 +438,9 @@ export async function startWeChatMonitor(
       for (const chat of chats) {
         if (abortSignal.aborted) break;
         const chatId = chat.username ?? chat.id;
-        if (isOfficialAccount(chatId)) continue; // skip official accounts
+        if (!shouldPollWeChatChat(chat, pollAccount)) continue;
         if (workQueue.has(chatId)) continue;
+        if (shouldThrottleMessageGap(chat, pendingMessageGaps.get(chatId), now)) continue;
         const prevSeen = lastSeenId.get(chatId);
         if (prevSeen === undefined) continue; // not tracked yet
         if (unreadChats.some((c) => (c.username ?? c.id) === chatId)) continue; // already processed
@@ -373,6 +472,7 @@ export async function startWeChatMonitor(
       );
     } finally {
       saveLastSeen();
+      saveLastSeenMessageKeys();
     }
 
     await sleep(account.pollIntervalMs, abortSignal);
@@ -684,15 +784,22 @@ async function sendWechatTextWithFallback(
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
 
-  const parts = text.split(/\r?\n/).filter((part) => part.length > 0);
-  const payload = (parts.length > 0 ? parts : [text]).join("\n");
-  const prefixedPayload = prefixWechatReply(payload);
   try {
-    await withWeChatUi(() => execFileAsync(
-      "docker",
-      ["exec", "agent-wechat", "/opt/tools/send-wechat-text", String(chatId), prefixedPayload],
-      { timeout: 300000, maxBuffer: 4 * 1024 * 1024 },
-    ));
+    await sendWechatReplyLines(
+      text,
+      async (payload) => {
+        await withWeChatUi(() => execFileAsync(
+          "docker",
+          ["exec", "agent-wechat", "/opt/tools/send-wechat-text", String(chatId), payload],
+          { timeout: 300000, maxBuffer: 4 * 1024 * 1024 },
+        ));
+      },
+      (index, total) => {
+        log?.info?.(
+          `[wechat:${liveAccount.accountId}] Reply line ${index}/${total} confirmed for ${chatId}`,
+        );
+      },
+    );
     log?.info?.(`[wechat:${liveAccount.accountId}] Reply confirmed for ${chatId}`);
   } catch (err) {
     const failure = err as { code?: string | number; signal?: string; killed?: boolean };
@@ -783,9 +890,11 @@ async function dispatchSegment(
     });
 
     return await withWeChatSession(route.sessionKey, async () => {
+    const historyContext = await buildWeChatHistoryContext(chatId, rawBody, log);
     const fromLabel = isGroup
       ? `group:${chat.name || chatId}`
       : senderName || `user:${senderId}`;
+    const currentMessageBody = labelWeChatMessage(senderName, senderId, rawBody);
     const storePath = core.channel.session.resolveStorePath(
       cfg.session?.store,
       { agentId: route.agentId },
@@ -811,7 +920,7 @@ async function dispatchSegment(
         timestamp,
         previousTimestamp,
         envelope: envelopeOptions,
-        body: isGroup ? `${senderName}: ${rawBody}` : rawBody,
+        body: currentMessageBody,
       });
     } else {
       // Multi-message batch: earlier messages become history context
@@ -819,7 +928,7 @@ async function dispatchSegment(
 
       // Format history entries
       const historyLines = historyMessages.map((pm) => {
-        const entryBody = pm.isGroup ? `${pm.senderName}: ${pm.rawBody}` : pm.rawBody;
+        const entryBody = labelWeChatMessage(pm.senderName, pm.senderId, pm.rawBody);
         return core.channel.reply.formatAgentEnvelope({
           channel: "WeChat",
           from: fromLabel,
@@ -836,7 +945,7 @@ async function dispatchSegment(
         timestamp,
         previousTimestamp,
         envelope: envelopeOptions,
-        body: isGroup ? `${senderName}: ${rawBody}` : rawBody,
+        body: currentMessageBody,
       });
 
       // Combine with history context markers
@@ -856,6 +965,13 @@ async function dispatchSegment(
       }));
     }
 
+    body = [
+      historyContext,
+      "",
+      ...(segment.length === 1 ? [CURRENT_MESSAGE_MARKER] : []),
+      body,
+    ].join("\n");
+
     // For non-final batches, instruct agent to suppress reply (NO_REPLY token)
     if (remainingSegments && remainingSegments > 0) {
       body += `\n\n[More messages incoming — respond only with NO_REPLY]`;
@@ -864,7 +980,7 @@ async function dispatchSegment(
     // Build inbound context
     const ctxPayload = core.channel.reply.finalizeInboundContext({
       Body: body,
-      BodyForAgent: rawBody,
+      BodyForAgent: body,
       RawBody: rawBody,
       CommandBody: commandBody,
       InboundHistory: inboundHistory,
@@ -910,13 +1026,16 @@ async function dispatchSegment(
       accountId: liveAccount.accountId,
     });
 
-    let deliveryFailed = false;
-    await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
-      ctx: ctxPayload,
-      cfg,
-      dispatcherOptions: {
-        ...prefixOptions,
-        deliver: async (payload: any) => {
+      let deliveryFailed = false;
+      let deliveredPayloadCount = 0;
+      const dispatchReply = (abortSignal: AbortSignal) =>
+        core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+          ctx: ctxPayload,
+          cfg,
+          dispatcherOptions: {
+            ...prefixOptions,
+            deliver: async (payload: any) => {
+              deliveredPayloadCount++;
           const mediaList: string[] = payload.mediaUrls?.length
             ? payload.mediaUrls
             : payload.mediaUrl
@@ -936,30 +1055,7 @@ async function dispatchSegment(
           if (mediaList.length > 0) {
             for (const mediaUrl of mediaList) {
               try {
-                const fsmod = await import("fs/promises");
-                const pathmod = await import("path");
-
-                let base64: string;
-                let mimeType: string;
-                let filename: string;
-                if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
-                  const res = await fetch(mediaUrl);
-                  const buffer = await res.arrayBuffer();
-                  base64 = Buffer.from(buffer).toString("base64");
-                  mimeType = res.headers.get("content-type") ?? "application/octet-stream";
-                  const urlPath = new URL(mediaUrl).pathname;
-                  filename = pathmod.basename(urlPath) || "file";
-                } else {
-                  const buf = await fsmod.readFile(mediaUrl);
-                  base64 = buf.toString("base64");
-                  filename = pathmod.basename(mediaUrl);
-                  const ext = pathmod.extname(mediaUrl).toLowerCase().replace(".", "");
-                  const extMime: Record<string, string> = {
-                    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
-                    gif: "image/gif", webp: "image/webp",
-                  };
-                  mimeType = extMime[ext] ?? "application/octet-stream";
-                }
+                const { base64, filename, mimeType } = await loadWechatMedia(mediaUrl);
 
                 const isImage = mimeType.startsWith("image/");
                 if (isImage) {
@@ -979,18 +1075,33 @@ async function dispatchSegment(
           } else if (text) {
             await sendWechatTextWithFallback(client, chatId, text, liveAccount, log);
           }
+            },
+            onError: (err: unknown, info: any) => {
+              deliveryFailed = true;
+              log?.error?.(
+                `[wechat:${liveAccount.accountId}] ${info.kind} reply failed: ${String(err)}`,
+              );
+            },
+          },
+          replyOptions: {
+            onModelSelected,
+            abortSignal,
+          },
+        });
+
+      await runWithReplyWatchdog(
+        (abortSignal) => dispatchReply(abortSignal),
+        {
+          timeoutMs: 180_000,
+          maxAttempts: 2,
+          canRetry: () => deliveredPayloadCount === 0,
+          onTimeout: (attempt, timeoutMs) => {
+            log?.error?.(
+              `[wechat:${liveAccount.accountId}] Model reply watchdog timeout: attempt=${attempt}, timeoutMs=${timeoutMs}, deliveredPayloads=${deliveredPayloadCount}`,
+            );
+          },
         },
-        onError: (err: unknown, info: any) => {
-          deliveryFailed = true;
-          log?.error?.(
-            `[wechat:${liveAccount.accountId}] ${info.kind} reply failed: ${String(err)}`,
-          );
-        },
-      },
-      replyOptions: {
-        onModelSelected,
-      },
-    });
+      );
 
     // Record activity
     core.channel.activity?.record?.({
@@ -1041,7 +1152,10 @@ async function processUnreadChat(
   skipOpen?: boolean,
   groupHistory?: Map<string, ProcessedMessage[]>,
   groupHistoryLimit?: number,
-): Promise<void> {
+  fallbackSeenId?: Map<string, number>,
+  lastSeenMessageKey?: Map<string, string>,
+  pendingMessageGaps?: Map<string, PendingMessageGap>,
+): Promise<boolean> {
   const core = getWeChatRuntime();
   // Re-resolve account from hot-reloaded config so policy changes take effect
   const liveAccount =
@@ -1087,14 +1201,14 @@ async function processUnreadChat(
     log?.error?.(
       `[wechat:${liveAccount.accountId}] Failed to list messages for ${chatId}: ${err}`,
     );
-    return;
+    return false;
   }
 
   log?.info?.(
     `[wechat:${liveAccount.accountId}] ${chatId}: fetched ${messages.length} msgs, firstPoll=${firstPoll}, prevLastSeen=${prevLastSeen}, unreadCount=${chat.unreadCount}`,
   );
 
-  if (messages.length === 0) return;
+  if (messages.length === 0) return false;
 
   // On first poll, only process the last `unreadCount` messages
   // and seed lastSeenId from the rest
@@ -1113,15 +1227,64 @@ async function processUnreadChat(
       // No unreads — just seed lastSeenId, don't process anything
       const maxId = messages[messages.length - 1].localId;
       lastSeenId.set(chatId, maxId);
-      return;
+      return true;
     }
   } else {
-    newMessages = messages.filter((m) => m.localId > prevLastSeen);
+    const maxFetchedId = Math.max(...messages.map((m) => m.localId));
+    const indexedGap = Boolean(chat.lastMsgLocalId && chat.lastMsgLocalId > maxFetchedId);
+    const alreadyUsedFallback = fallbackSeenId?.get(chatId) === chat.lastMsgLocalId;
+    const previousMessageKey = lastSeenMessageKey?.get(chatId);
+    const effectivePrevLastSeen =
+      getEffectivePreviousLastSeen(
+        chat,
+        indexedGap && chat.unreadCount > 0 && !alreadyUsedFallback
+          ? Math.min(prevLastSeen, maxFetchedId)
+          : prevLastSeen,
+        maxFetchedId,
+        previousMessageKey,
+      );
+    newMessages = messages.filter((m) => m.localId > effectivePrevLastSeen);
     if (newMessages.length === 0) {
-      // Don't update lastSeenId — if session.db reports a newer message
-      // (via lastMsgLocalId) that hasn't appeared in message_N.db yet,
-      // the catch-up loop will re-fire on the next poll.
-      return;
+      const fallback = buildMessageFallback(chat, effectivePrevLastSeen);
+      if (fallback) {
+        if (chat.isGroup && fallback.sender && !/^wxid_|^gh_|^filehelper$|@chatroom$/.test(fallback.sender)) {
+          try {
+            const contacts = await client.findContacts(fallback.sender);
+            const exact = contacts.find((contact) =>
+              contact.username === fallback.sender ||
+              contact.remark === fallback.sender ||
+              contact.nickName === fallback.sender ||
+              contact.alias === fallback.sender,
+            );
+            if (exact) {
+              fallback.sender = exact.username;
+              fallback.senderName = exact.remark || exact.nickName || exact.username;
+            }
+          } catch (err) {
+            log?.error?.(
+              `[wechat:${liveAccount.accountId}] Fallback sender resolution failed for ${chatId}: ${err}`,
+            );
+          }
+        }
+        newMessages = [fallback];
+        fallbackSeenId?.set(chatId, fallback.localId);
+        log?.info?.(
+          `[wechat:${liveAccount.accountId}] ${chatId}: using message index fallback for localId=${fallback.localId}`,
+        );
+      } else {
+        pendingMessageGaps?.set(
+          chatId,
+          scheduleMessageGapRetry(
+            chat,
+            pendingMessageGaps?.get(chatId),
+            Date.now(),
+          ),
+        );
+        log?.info?.(
+          `[wechat:${liveAccount.accountId}] ${chatId}: indexed localId=${chat.lastMsgLocalId ?? "unknown"} is not available yet; retrying with backoff`,
+        );
+        return false;
+      }
     }
     newMessages.sort((a, b) => a.localId - b.localId);
   }
@@ -1160,7 +1323,7 @@ async function processUnreadChat(
         log?.info?.(`[wechat:${liveAccount.accountId}] Buffered ${processed.length} msg(s) for group history in ${chatId}`);
         const maxId = Math.max(...newMessages.map((m) => m.localId));
         lastSeenId.set(chatId, maxId);
-        return;
+          return true;
       }
 
       if (hasMention) {
@@ -1228,8 +1391,8 @@ async function processUnreadChat(
         hasControlCommandInWindow ? undefined : remaining,
       );
       if (dispatched === "failed") {
-        log?.error?.(`[wechat:${liveAccount.accountId}] Retaining messages for a delivery retry in ${chatId}`);
-        return;
+          log?.error?.(`[wechat:${liveAccount.accountId}] Retaining messages for a delivery retry in ${chatId}`);
+          return false;
       }
       if (dispatched === "skipped") {
         allDispatched = false;
@@ -1245,4 +1408,5 @@ async function processUnreadChat(
   // Update lastSeenId (track all messages including self-sent/filtered)
   const maxId = Math.max(...newMessages.map((m) => m.localId));
   lastSeenId.set(chatId, maxId);
+  return true;
 }

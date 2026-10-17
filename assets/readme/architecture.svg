@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="376" viewBox="0 0 1280 376" role="img" aria-labelledby="title description">
+  <title id="title">DXbot message flow</title>
+  <desc id="description">WeChat uses the Rust agent-server and channel extension. Douyin uses the Playwright bridge. Both call OpenClaw and return replies through their own delivery layers.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="m0 0 7 3.5L0 7" fill="none" stroke="#7c8e82" stroke-width="1.3"/></marker>
+  </defs>
+  <rect x=".5" y=".5" width="1279" height="375" rx="8" fill="#f7faf8" stroke="#dce6df"/>
+  <g font-family="Arial, Helvetica, sans-serif" letter-spacing="0">
+    <text x="34" y="37" fill="#62736a" font-size="12">CHANNELS</text>
+    <text x="342" y="37" fill="#62736a" font-size="12">MESSAGE ADAPTERS</text>
+    <text x="716" y="37" fill="#62736a" font-size="12">CONTEXT + INFERENCE</text>
+  </g>
+  <g fill="none" stroke="#8b9f91" stroke-width="1.5" marker-end="url(#arrow)">
+    <path d="M247 101h89"/>
+    <path d="M247 230h89"/>
+    <path d="M619 101h37v66h52"/>
+    <path d="M619 230h37v-63"/>
+    <path d="M990 167h46"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" letter-spacing="0">
+    <rect x="34" y="65" width="213" height="72" rx="6" fill="#e8f5ed" stroke="#bfdbc9"/>
+    <rect x="34" y="65" width="4" height="72" rx="2" fill="#39a96b"/>
+    <text x="54" y="94" fill="#1d3427" font-size="19" font-weight="600">WeChat</text>
+    <text x="54" y="117" fill="#536a5b" font-size="13">Direct + group + media</text>
+    <rect x="34" y="194" width="213" height="72" rx="6" fill="#fff0e9" stroke="#ecd2c5"/>
+    <rect x="34" y="194" width="4" height="72" rx="2" fill="#ce7356"/>
+    <text x="54" y="223" fill="#493128" font-size="19" font-weight="600">Douyin</text>
+    <text x="54" y="246" fill="#836255" font-size="13">Selected direct text</text>
+    <rect x="342" y="65" width="277" height="72" rx="6" fill="#fff" stroke="#d4e0d8"/>
+    <text x="362" y="94" fill="#23372b" font-size="18" font-weight="600">Rust API + channel</text>
+    <text x="362" y="117" fill="#62736a" font-size="13">Policy / sender / history / media</text>
+    <rect x="342" y="194" width="277" height="72" rx="6" fill="#fff" stroke="#d4e0d8"/>
+    <text x="362" y="223" fill="#23372b" font-size="18" font-weight="600">Playwright bridge</text>
+    <text x="362" y="246" fill="#62736a" font-size="13">Target / text / fingerprint</text>
+    <rect x="716" y="121" width="274" height="92" rx="6" fill="#223c2c"/>
+    <text x="737" y="156" fill="#f2f8f4" font-size="23" font-weight="600">OpenClaw</text>
+    <text x="737" y="183" fill="#b8d7c2" font-size="13">Rules / identity / session context</text>
+    <rect x="1044" y="131" width="202" height="72" rx="6" fill="#fff" stroke="#d4e0d8"/>
+    <text x="1065" y="161" fill="#23372b" font-size="19" font-weight="600">Your model</text>
+    <text x="1065" y="184" fill="#62736a" font-size="13">Configured in OpenClaw</text>
+    <path d="M34 300h1212" stroke="#dce6df"/>
+    <text x="54" y="338" fill="#23372b" font-size="14" font-weight="600">REPLY PATH</text>
+    <text x="188" y="338" fill="#62736a" font-size="14">Model output</text>
+    <path d="M296 333h48" fill="none" stroke="#8b9f91" marker-end="url(#arrow)"/>
+    <text x="363" y="338" fill="#23372b" font-size="14" font-weight="600">DXbot:</text>
+    <text x="418" y="338" fill="#62736a" font-size="14">in the delivery layer</text>
+    <path d="M554 333h48" fill="none" stroke="#8b9f91" marker-end="url(#arrow)"/>
+    <text x="622" y="338" fill="#62736a" font-size="14">The corresponding channel sends the reply</text>
+  </g>
+</svg>

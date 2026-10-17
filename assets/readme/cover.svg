@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title description">
+  <title id="title">DXbot</title>
+  <desc id="description">Self-hosted WeChat and Douyin messaging automation powered by OpenClaw.</desc>
+  <rect width="1280" height="360" fill="#141b17"/>
+  <path d="M0 1h1280" stroke="#74e5ad" stroke-width="2"/>
+  <g stroke="#334239" stroke-width="1" opacity=".5">
+    <path d="M864 0v360M904 0v360M944 0v360M984 0v360M1024 0v360M1064 0v360M1104 0v360M1144 0v360M1184 0v360M1224 0v360M1264 0v360"/>
+    <path d="M864 40h416M864 80h416M864 120h416M864 160h416M864 200h416M864 240h416M864 280h416M864 320h416"/>
+  </g>
+  <rect x="902" y="56" width="322" height="248" fill="#141b17"/>
+  <g fill="none" stroke="#74e5ad" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M79 98h66a12 12 0 0 1 12 12v39a12 12 0 0 1-12 12h-24l-24 21v-21H79a12 12 0 0 1-12-12v-39a12 12 0 0 1 12-12Z"/>
+    <path d="m91 119 12 12-12 12m24 0h17"/>
+  </g>
+  <text x="185" y="166" fill="#f3f7f4" font-family="Arial, Helvetica, sans-serif" font-size="100" font-weight="700" letter-spacing="0">DX<tspan fill="#74e5ad">bot</tspan></text>
+  <text x="70" y="231" fill="#e1e9e3" font-family="Arial, Helvetica, sans-serif" font-size="26" letter-spacing="0">Your models. Your context. Your conversations.</text>
+  <text x="72" y="294" fill="#94a59a" font-family="Consolas, monospace" font-size="13" letter-spacing="0">SELF-HOSTED  /  OPENCLAW  /  MESSAGING AUTOMATION</text>
+  <g font-family="Arial, Helvetica, sans-serif" letter-spacing="0">
+    <text x="944" y="105" fill="#94a59a" font-size="12">CONNECTED CHANNELS</text>
+    <rect x="944" y="132" width="8" height="8" rx="2" fill="#74e5ad"/>
+    <text x="970" y="145" fill="#f3f7f4" font-size="24" font-weight="600">WeChat</text>
+    <text x="970" y="170" fill="#94a59a" font-size="13">CLIENT + CHANNEL</text>
+    <path d="M944 194h220" stroke="#34453a"/>
+    <rect x="944" y="220" width="8" height="8" rx="2" fill="#fa9d87"/>
+    <text x="970" y="233" fill="#f3f7f4" font-size="24" font-weight="600">Douyin</text>
+    <text x="970" y="258" fill="#94a59a" font-size="13">BROWSER + BRIDGE</text>
+  </g>
+  <path d="M69 328h1142" stroke="#34453a"/>
+  <rect x="69" y="327" width="60" height="2" fill="#74e5ad"/>
+  <rect x="1175" y="327" width="36" height="2" fill="#fa9d87"/>
+</svg>

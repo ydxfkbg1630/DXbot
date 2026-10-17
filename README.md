@@ -1,118 +1,85 @@
-# DXbot
+<p align="center">
+  <img src="assets/readme/cover.svg" alt="DXbot | Self-hosted messaging automation for WeChat and Douyin" width="100%">
+</p>
 
-DXbot 是一个面向服务器部署的微信、抖音自动回复与 OpenClaw 接入项目。微信通过 `agent-server` 提供客户端控制和消息、媒体访问；抖音通过独立 Python + Playwright 桥接进程监听指定好友的私信。两条链路使用 OpenClaw 调用模型，并在发送层添加 `DXbot:` 标识。
+<h3 align="center">把你的 AI 接入微信与抖音。</h3>
 
-本仓库同步自服务器上的实际运行项目，包含微信消息与媒体链路、OpenClaw 微信扩展、历史上下文和回复可靠性模块，以及抖音私信文本自动回复适配。当前同步日期：2026-10-17。
+<p align="center">
+  Self-hosted messaging automation, powered by OpenClaw.
+</p>
 
-**许可范围：** DXbot 原创贡献采用 **AGPL-3.0-only**；抖音目录采用 **PolyForm Noncommercial 1.0.0**；微信继承代码的授权范围以原作者明确授予的条款为准。完整说明见 [LICENSING.md](LICENSING.md) 和[第三方声明](THIRD_PARTY_NOTICES.md)。
+<p align="center">
+  <a href="https://github.com/ydxfkbg1630/DXbot/actions/workflows/release.yml"><img src="https://github.com/ydxfkbg1630/DXbot/actions/workflows/release.yml/badge.svg?branch=main" alt="Release workflow"></a>
+  <a href="https://github.com/ydxfkbg1630/DXbot/actions/workflows/douyin-test.yml"><img src="https://github.com/ydxfkbg1630/DXbot/actions/workflows/douyin-test.yml/badge.svg?branch=main" alt="Douyin tests"></a>
+  <a href="https://github.com/ydxfkbg1630/DXbot/tree/main/packages/openclaw-extension"><img src="https://img.shields.io/badge/powered%20by-OpenClaw-293d35?style=flat&labelColor=202723" alt="Powered by OpenClaw"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/license-component%20scopes-496b5a?style=flat&labelColor=202723" alt="Component-specific license scopes"></a>
+</p>
 
-## 平台入口
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#平台能力">平台能力</a> ·
+  <a href="#工作方式">工作方式</a> ·
+  <a href="#文档导航">文档</a> ·
+  <a href="#许可与来源">许可</a>
+</p>
 
-| 平台 | 接入方式 | 文档 |
-|------|----------|------|
-| 微信 | Rust 服务 + OpenClaw 微信频道扩展 | 本页微信部署和 OpenClaw 接入章节 |
-| 抖音 | Python + Playwright 私信桥接 | [抖音配置、登录、启动与日志](integrations/douyin/README.md) |
+---
 
-## 核心能力
+## DXbot 是什么
 
-- 微信私聊和群聊消息轮询
-- 群聊 @ 提及、白名单和会话策略
-- 消息水位持久化与消息间隙补偿
-- 轮询门控，过滤系统会话、公众号和策略关闭的聊天
-- 图片、语音、视频、文件和表情消息处理
-- 微信客户端媒体保存、远程媒体下载和 MIME 类型推断
-- 历史消息与会话记忆上下文接入
-- 历史上下文数量、模式和 SHA-256 校验
-- OpenClaw 微信频道扩展
-- 抖音指定好友私信文本监听与自动回复
-- 抖音好友级 ASCII 哈希会话 ID、消息指纹持久化和启动基线
-- OpenClaw 单行、多行 JSON 回复解析
-- 模型回复超时看门狗与空投递重试
-- 多行回复逐行发送与发送进度记录
-- 机器人发送层固定添加 `DXbot:` 前缀
-- Docker、Rust/Axum、TypeScript、SQLite 和确定性 FSM
+DXbot 把微信客户端自动化、抖音私信桥接和 OpenClaw 模型调用放进一套自托管工作流。你负责选择模型、配置会话策略与回复风格，DXbot 负责连接消息、上下文和发送过程。
 
-## 微信回复流程
+项目面向个人服务器与自托管部署，提供 **Rust 微信服务、OpenClaw 微信扩展和 Python 抖音桥接**。配置、会话状态与部署数据由你管理。
 
-```text
-微信客户端
-    │
-    ▼
-agent-server（Rust/Axum，端口 6174）
-    │ 读取消息、保存水位、下载媒体、保存会话状态
-    ▼
-OpenClaw 微信扩展
-    │ 轮询门控、消息补偿、历史上下文、媒体路径和发送者标签
-    ▼
-模型供应商
-    │ 生成原始回复
-    ▼
-回复看门狗与发送器
-    │ 超时重试、逐行发送、统一添加 DXbot:
-    ▼
-微信客户端发送
-```
+| 消息接入 | 上下文与策略 | 回复与投递 |
+|----------|--------------|------------|
+| 微信私聊、群聊与媒体访问 | 发送者标签、白名单与群聊策略 | 发送层统一添加 `DXbot:` |
+| 抖音指定好友私信文本 | OpenClaw 工作区规则与独立会话 | 微信多行回复逐条投递 |
+| 微信消息水位与间隙补偿 | 微信历史上下文扩展与完整性校验 | 回复看门狗与发送进度记录 |
 
-`DXbot:` 位于最终发送层，模型收到的系统规则、历史会话和记忆内容保持原始形态。相关实现位于：
+## 平台能力
 
-```text
-packages/openclaw-extension/src/reply-prefix.ts
-packages/openclaw-extension/src/reply-sender.ts
-packages/openclaw-extension/src/monitor.ts
-```
+| 能力 | 微信 | 抖音 |
+|------|------|------|
+| 接入形态 | Rust 服务 + OpenClaw 频道扩展 | Python + Playwright 独立桥接 |
+| 会话范围 | 私聊与群聊 | 配置中指定的好友私信 |
+| 文本自动回复 | 支持 | 支持 |
+| 媒体处理 | 图片、语音、视频、表情与附件的获取和传递入口 | 随附定时发送引擎支持图片、原生表情 |
+| 上下文 | 历史上下文接入、发送者信息、会话记忆 | 对方昵称、当前文本、独立模型会话 |
+| 消息状态 | 聊天水位、指纹与间隙重试 | 指纹持久化与首次启动基线 |
+| 发送标识 | `DXbot:` | `DXbot:` |
 
-发送结果示例：
+微信历史接入依赖部署环境的历史存储脚本，媒体理解取决于获取结果、OpenClaw 配置及模型能力。抖音桥接按页面可识别的最近一条对方文本轮询，适合低频私信。完整配置和配套要求见[部署指南](docs/DEPLOYMENT.md)与[抖音文档](integrations/douyin/README.md)。
 
-```text
-DXbot: 这是模型生成的回复
-```
+## 工作方式
 
-## 可靠性模块
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/architecture-dark.svg">
+  <img src="assets/readme/architecture.svg" alt="微信经 Rust 服务与频道扩展、抖音经 Playwright 桥接进入 OpenClaw，再由模型生成回复并经对应发送层返回" width="100%">
+</picture>
 
-OpenClaw 微信扩展的主要可靠性模块如下：
+微信扩展负责聊天策略、发送者标签、历史上下文和媒体路径。抖音桥接按好友生成独立的 ASCII 会话 ID，再调用 OpenClaw CLI。两条链路在各自发送入口添加 `DXbot:`，让接收者识别机器人回复。
+
+<details>
+<summary><strong>消息可靠性与实现位置</strong></summary>
 
 | 模块 | 作用 |
 |------|------|
-| `message-watermark.ts` | 记录聊天水位、消息指纹和消息间隙重试状态 |
-| `message-fallback.ts` | 在消息索引延迟期间使用聊天预览构造可处理消息 |
-| `poll-gate.ts` | 按私聊、群聊、白名单和系统会话策略控制轮询 |
-| `reply-watchdog.ts` | 为模型回复设置超时、取消信号和空投递重试 |
-| `reply-sender.ts` | 拆分多行回复，逐行加前缀并发送 |
-| `wechat-history-context.ts` | 读取历史上下文并验证数量、模式和哈希 |
-| `wechat-media.ts` | 加载本地路径或 HTTP 媒体并推断 MIME 类型 |
-| `wechat-sender-label.ts` | 为模型输入添加发送者名称或 ID |
-| `chat-work-queue.ts` | 按聊天维度管理并发任务与 UI 操作 |
+| [`message-watermark.ts`](packages/openclaw-extension/src/message-watermark.ts) | 保存微信聊天水位与消息间隙重试状态 |
+| [`poll-gate.ts`](packages/openclaw-extension/src/poll-gate.ts) | 按私聊、群聊、白名单和会话类型控制轮询 |
+| [`reply-watchdog.ts`](packages/openclaw-extension/src/reply-watchdog.ts) | 管理回复超时、取消信号与空投递重试 |
+| [`reply-sender.ts`](packages/openclaw-extension/src/reply-sender.ts) | 拆分多行回复、记录进度并添加发送标识 |
+| [`wechat-history-context.ts`](packages/openclaw-extension/src/wechat-history-context.ts) | 对接历史存储脚本，校验数量、模式和哈希 |
+| [`douyin_bridge.py`](integrations/douyin/app/douyin_bridge.py) | 定位好友、读取文本、调用 OpenClaw 并发送 |
+| [`bridge_core.py`](integrations/douyin/app/bridge_core.py) | 生成消息指纹与提示文本，解析模型 JSON 回复 |
 
-## 项目结构
+</details>
 
-```text
-packages/
-├── agent-server-rust/    Rust/Axum 服务、微信 UI 自动化和媒体访问
-├── openclaw-extension/   OpenClaw 微信频道扩展
-├── shared/               Rust 与 TypeScript 共用类型
-├── cli/                  命令行工具
-├── wechaty-gateway/      Wechaty 网关
-└── wechaty-puppet/       Wechaty Puppet
+## 快速开始
 
-docker/                   Docker 镜像和微信客户端工具
-docs/                     项目文档
-scripts/                  构建、部署和类型生成脚本
-integrations/douyin/       抖音桥接、发送引擎、登录脚本和 Python 测试
-```
+### 1. 准备源码
 
-## 环境要求
-
-- Linux 服务器或具备完整 Docker 能力的主机
-- Docker 和 Docker Compose
-- Node.js 22 或更高版本
-- pnpm 9.15.4
-- Rust stable 工具链
-- 微信账号登录所需的二维码扫描设备
-- `SYS_PTRACE` 和 `seccomp=unconfined` 容器能力
-
-微信运行在 Docker 容器中的图形环境内，服务器需要保留持久化数据卷。
-
-## 从源码构建
+微信服务部署面向具备 Docker 能力的 Linux 主机，Node.js 要求 **22+**，包管理器使用 **pnpm 9.15.4**。抖音桥接使用独立的 **Python 3.11+** 环境。
 
 ```bash
 git clone https://github.com/ydxfkbg1630/DXbot.git
@@ -121,101 +88,24 @@ cd DXbot
 corepack enable
 corepack prepare pnpm@9.15.4 --activate
 pnpm install --frozen-lockfile
-
 pnpm build
-pnpm typecheck
-pnpm -r --if-present test
 ```
 
-Rust 服务检查：
+### 2. 选择接入平台
 
-```bash
-cargo check --manifest-path packages/agent-server-rust/Cargo.toml
-cargo test --manifest-path packages/agent-server-rust/Cargo.toml
-```
+**微信**
 
-## Docker 启动
-
-先创建认证令牌：
-
-```bash
-mkdir -p ~/.config/agent-wechat
-openssl rand -hex 32 > ~/.config/agent-wechat/token
-chmod 600 ~/.config/agent-wechat/token
-```
-
-启动容器：
-
-```bash
-docker compose up -d
-docker compose logs -f agent-wechat
-```
-
-服务默认端口：
-
-| 端口 | 用途 |
-|------|------|
-| `6174` | agent-server REST API、WebSocket 和 VNC |
-
-本地镜像构建：
-
-```bash
-pnpm build:image:amd64
-pnpm build:image:arm64
-pnpm build:image:all
-```
-
-## OpenClaw 接入
-
-构建微信扩展：
-
-```bash
-pnpm --filter @agent-wechat/wechat build
-```
-
-本地开发安装：
+先按[源码部署指南](docs/DEPLOYMENT.md#docker-启动)构建镜像、对齐部署配套并完成客户端登录。将本仓库的微信扩展接入现有 OpenClaw：
 
 ```bash
 openclaw plugins install -l ./packages/openclaw-extension
 ```
 
-微信频道配置示例：
+然后配置模型供应商、微信服务地址、认证令牌及会话策略。参数示例见 [OpenClaw 接入](docs/DEPLOYMENT.md#openclaw-接入)。
 
-```json
-{
-  "channels": {
-    "wechat": {
-      "enabled": true,
-      "serverUrl": "http://127.0.0.1:6174",
-      "token": "${AGENT_WECHAT_TOKEN}",
-      "dmPolicy": "allowlist",
-      "allowFrom": ["wxid_example"],
-      "groupPolicy": "allowlist",
-      "groupAllowFrom": ["wxid_example"],
-      "pollIntervalMs": 1000,
-      "authPollIntervalMs": 30000
-    }
-  }
-}
-```
+**抖音**
 
-服务器地址、令牌、模型 API Key 和白名单属于部署配置，推荐通过环境变量、OpenClaw 配置目录或服务器密钥管理服务注入。
-
-## 抖音接入
-
-抖音适配位于 [`integrations/douyin`](integrations/douyin/README.md)，以独立进程调用现有 OpenClaw CLI。模型供应商和 `SOUL.md` 等工作区规则由 OpenClaw 管理。
-
-```text
-抖音网页私信
-  → Playwright 定位配置中的好友
-  → 读取最近一条可识别的对方文本并比较消息指纹
-  → OpenClaw 独立会话 ID：douyin-direct-<好友昵称 SHA-256 前 16 位>
-  → 解析模型 JSON 回复
-  → 发送层添加 DXbot: 并通过抖音网页发送
-  → 保存处理指纹
-```
-
-Linux 服务器安装和启动：
+在已经配置好 OpenClaw 的主机上，准备独立桥接环境：
 
 ```bash
 cd integrations/douyin
@@ -225,134 +115,65 @@ python3.12 -m venv .venv
 
 cp bridge.example.json bridge.json
 cp .env.bridge.example .env.bridge
-# 在 bridge.json 填写目标好友昵称，在 .env.bridge 填写登录态和 OpenClaw 路径
-# storage-state.json 由 scripts/login.py 在有图形界面的电脑上扫码生成后传入
+```
 
+在桌面端通过 `scripts/login.py` 完成扫码，把生成的登录态传入服务器，填写目标好友及 OpenClaw 路径后启动：
+
+```bash
 .venv/bin/python -m app.douyin_bridge --config bridge.json --env-file .env.bridge
 ```
 
-当前自动回复范围为指定好友的私信文本，轮询以页面可识别的最近一条对方文本为单位。图片和抖音原生表情的定时发送由随附的上游发送引擎提供，使用 `run.py` 和任务配置。详细登录步骤、后台运行、日志和能力范围见[抖音文档](integrations/douyin/README.md)。
+完整步骤见[抖音登录、配置与运行](integrations/douyin/README.md)。
 
-## 微信媒体链路
+## 文档导航
 
-媒体消息经过以下步骤进入模型：
+| 我想做什么 | 从这里开始 |
+|------------|------------|
+| 部署微信、对齐服务端配套、配置 OpenClaw | [部署与运维](docs/DEPLOYMENT.md) |
+| 配置抖音监听目标、扫码登录、查看桥接日志 | [抖音私信桥接](integrations/douyin/README.md) |
+| 使用命令行查询会话或发送消息 | [CLI 命令](docs/src/content/docs/getting-started/cli/commands.mdx) |
+| 了解 REST 与 WebSocket 接口 | [API 参考](docs/src/content/docs/reference/api.mdx) |
+| 管理认证、数据卷、远程访问和代理 | [运维文档](docs/src/content/docs/operations) |
+| 排查登录、消息和客户端问题 | [故障排查](docs/src/content/docs/reference/troubleshooting.mdx) |
+| 贡献代码、测试或文档 | [贡献说明](CONTRIBUTING.md) |
 
-1. agent-server 识别微信消息类型
-2. 微信客户端保存原始媒体，服务端读取客户端保存结果
-3. 服务端验证文件格式并保存到 OpenClaw 媒体目录
-4. OpenClaw 解析本地路径、HTTP 地址、文件名和 MIME 类型
-5. 历史上下文与当前媒体消息一起进入回复会话
-6. 模型根据图片、语音、文件或表情内容生成回复
-7. 媒体回复与文本说明经过统一发送层发回微信
+## 项目结构
 
-图片、语音和文件数据属于运行时数据，存储在部署服务器的数据卷中。公开仓库只保存源码和测试。
-
-## 消息接收与补偿
-
-扩展保存两类消息水位：
-
-- 聊天级 `lastMsgLocalId`
-- 当前消息的时间、发送者和预览指纹
-
-当微信聊天列表已经出现新消息，而消息索引仍处于同步阶段时，扩展会按递增间隔重试；聊天预览具备有效内容时，会构造消息补偿对象进入正常回复链路。机器人自身以 `DXbot:` 开头的预览会被识别为机器人消息，避免重复处理。
-
-## 常用命令
-
-```bash
-# 启动和停止微信容器
-pnpm cli up
-pnpm cli down
-
-# 查看状态和日志
-pnpm cli status
-pnpm cli logs
-
-# 登录微信
-pnpm cli auth login
-
-# 查询聊天和消息
-pnpm cli chats list
-pnpm cli find "群聊名称"
-pnpm cli messages list <chat-id>
-
-# 发送文本或图片
-pnpm cli messages send <chat-id> --text "你好"
-pnpm cli messages send <chat-id> --image ./example.png
+```text
+DXbot/
+├── packages/
+│   ├── agent-server-rust/    微信 UI 自动化、REST API 与媒体访问
+│   ├── openclaw-extension/   微信频道、策略、上下文与回复流程
+│   ├── cli/                  命令行客户端
+│   ├── shared/               Rust / TypeScript 共享类型
+│   ├── wechaty-gateway/      Wechaty 网关
+│   └── wechaty-puppet/       Wechaty Puppet
+├── integrations/douyin/     抖音桥接、定时发送引擎与测试
+├── docker/                  微信客户端镜像与工具
+├── docs/                    部署、架构与接口文档
+└── scripts/                 构建、部署与类型生成
 ```
 
-## 安全配置
+## 开发与验证
 
-- 认证令牌保存于 `~/.config/agent-wechat/token` 或 `AGENT_WECHAT_TOKEN`
-- 远程访问使用 HTTPS、网络访问控制和最小权限令牌
-- API Key、微信数据库、媒体文件和会话记忆保存在部署环境
-- 公开仓库只包含源码、文档、测试和构建配置
-- 日志、备份、运行时数据库、依赖目录和本地环境文件保存在部署环境
-
-提交代码前请检查令牌、密码、私钥、微信数据文件和服务器地址。
-
-## 开发与测试
+根据改动范围运行对应检查：
 
 ```bash
 pnpm build
 pnpm typecheck
 pnpm -r --if-present test
-pnpm dev:deploy
 ```
 
-OpenClaw 扩展的局部测试：
+Rust 服务和抖音桥接的测试命令见[开发与测试](docs/DEPLOYMENT.md#开发与测试)。抖音测试覆盖配置解析、好友定位、发送确认、消息指纹及模型回复解析；工作流结果可从页首徽章查看。
 
-```bash
-pnpm --filter @agent-wechat/wechat test
-```
+欢迎通过 [Issue](https://github.com/ydxfkbg1630/DXbot/issues) 提交复现与需求，通过 [Pull Request](https://github.com/ydxfkbg1630/DXbot/pulls) 参与改进。第三方代码请附上来源、版本和许可依据。
 
-抖音适配测试在独立 Python 环境中运行：
+## 许可与来源
 
-```bash
-cd integrations/douyin
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m playwright install --with-deps chromium
-.venv/bin/python -m pytest -q
-```
+DXbot 在 [thisnick/agent-wechat](https://github.com/thisnick/agent-wechat) 的微信自动化基础上扩展；抖音发送引擎来自 [unmev/douyin-auto-fire](https://github.com/unmev/douyin-auto-fire)。感谢上游作者与贡献者。
 
-微信 UI 操作由确定性 FSM 驱动，主要流程位于：
+本仓库采用**分范围许可**：维护者有权授权的 DXbot 原创贡献采用 **AGPL-3.0-only**；整个抖音目录维持 **PolyForm Noncommercial 1.0.0**。微信继承代码的完整授权范围仍需向上游权利人核实，第三方依赖和镜像组件按各自条款处理。
 
-```text
-packages/agent-server-rust/src/ia/
-packages/agent-server-rust/src/plans/
-packages/agent-server-rust/src/execution/
-```
+[许可范围](LICENSING.md) · [第三方声明](THIRD_PARTY_NOTICES.md) · [版权与署名](NOTICE.md) · [品牌使用](BRANDING.md)
 
-OpenClaw 微信回复流程位于：
-
-```text
-packages/openclaw-extension/src/monitor.ts
-packages/openclaw-extension/src/access-control.ts
-packages/openclaw-extension/src/chat-work-queue.ts
-packages/openclaw-extension/src/message-watermark.ts
-packages/openclaw-extension/src/reply-watchdog.ts
-```
-
-## 上游项目
-
-DXbot 基于 `agent-wechat` 的微信自动化能力扩展而来，保留原项目的 Docker、Rust 服务、CLI、Wechaty 和文档结构，并加入服务器部署场景所需的消息、媒体、会话、补偿和 OpenClaw 适配。
-
-抖音发送引擎来自 [unmev/douyin-auto-fire](https://github.com/unmev/douyin-auto-fire)，基准提交为 `af0035f764d3a1adac5884bc3d73adcf031a3dd6`。适配目录保留上游源码、原始说明和许可声明，来源详见 [NOTICE.md](integrations/douyin/NOTICE.md)。
-
-## 贡献
-
-欢迎提交 Issue、Pull Request、测试用例和文档改进。提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，运行构建、类型检查和相关测试，并在描述中说明验证命令和运行环境。
-
-## 许可证说明
-
-Copyright (c) 2026 **ydxfkbg1630**，限 DXbot 原创贡献。上游作者和其他贡献者保留其各自作品的版权。
-
-| 范围 | 许可与权利来源 |
-|------|----------------|
-| DXbot 维护者有权授权的原创代码、原创修改和原创文档 | [GNU AGPL v3，仅版本 3](LICENSE)，SPDX：`AGPL-3.0-only` |
-| `integrations/douyin/`，含发送引擎及桥接 | 维持该目录的 [PolyForm Noncommercial 1.0.0](integrations/douyin/LICENSE) 及[来源声明](integrations/douyin/NOTICE.md) |
-| 继承自 `thisnick/agent-wechat` 的代码和修改文件中的上游部分 | 保留原作者权利；完整授权依据按[第三方声明](THIRD_PARTY_NOTICES.md)核实 |
-| 第三方依赖、镜像组件、客户端和素材 | 各权利人提供的适用条款 |
-
-AGPL 覆盖部分允许按条款使用、修改和商业分发，要求保留版权和许可证，分发修改版时标注修改并提供相应源码。修改版通过网络与用户交互时，应按第 13 条向相关用户提供该版本完整对应源码的获取入口。抖音目录的使用范围按其非商业许可另行判断。
-
-完整许可范围、既有版本授权和源码交付说明见 [LICENSING.md](LICENSING.md)。署名信息见 [NOTICE.md](NOTICE.md)，项目名称和标识的使用说明见 [BRANDING.md](BRANDING.md)。
+Copyright (c) 2026 ydxfkbg1630，限 DXbot 原创贡献；各上游作者保留其作品版权。

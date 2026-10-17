@@ -1,0 +1,41 @@
+name: Douyin Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'integrations/douyin/**'
+      - '.github/workflows/douyin-test.yml'
+  pull_request:
+    paths:
+      - 'integrations/douyin/**'
+      - '.github/workflows/douyin-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: integrations/douyin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            integrations/douyin/requirements.txt
+            integrations/douyin/requirements-dev.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Test
+        run: python -m pytest -q

@@ -1,0 +1,10 @@
+{
+  "targets": [
+    "抖音好友昵称"
+  ],
+  "poll_interval_seconds": 5,
+  "state_path": "artifacts/bridge-state.json",
+  "reply_prefix": "DXbot: ",
+  "initial_message_policy": "mark_seen",
+  "openclaw_timeout_seconds": 180
+}

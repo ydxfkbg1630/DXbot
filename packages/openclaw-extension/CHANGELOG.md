@@ -1,5 +1,27 @@
 # @agent-wechat/wechat
 
+## 0.12.0
+
+### Minor Changes
+
+- [`ff8d7a3`](https://github.com/ydxfkbg1630/DXbot/commit/ff8d7a3dba7ebcd4860cf848162a0fed01a1afb9) Thanks [@ydxfkbg1630](https://github.com/ydxfkbg1630)! - Add the standalone Douyin private-message bridge, its sending engine and tests,
+  and document configuration, login, OpenClaw sessions, and deployment.
+
+### Patch Changes
+
+- [`2a425da`](https://github.com/ydxfkbg1630/DXbot/commit/2a425daf3b16d234b0e01319d82c96c2a23ee685) Thanks [@ydxfkbg1630](https://github.com/ydxfkbg1630)! - Align the documentation site's project identity, base URL, social previews,
+  and setup links with DXbot.
+
+- [`1150d96`](https://github.com/ydxfkbg1630/DXbot/commit/1150d967ddbeaf7754fd5e1e4755db4ca4195843) Thanks [@ydxfkbg1630](https://github.com/ydxfkbg1630)! - Document the AGPL-3.0-only grant for DXbot-owned original contributions,
+  preserve separate component scopes, and include license scope documents
+  in the OpenClaw extension package.
+
+- [`68981c3`](https://github.com/ydxfkbg1630/DXbot/commit/68981c3cae90587c5a963de8254461e3f616b5b2) Thanks [@ydxfkbg1630](https://github.com/ydxfkbg1630)! - Refresh the project README with DXbot branding, channel capabilities,
+  architecture visuals, and focused deployment documentation.
+
+- [`c953b6b`](https://github.com/ydxfkbg1630/DXbot/commit/c953b6bd262ef16ca721df86c0adef5fa0f27b97) Thanks [@ydxfkbg1630](https://github.com/ydxfkbg1630)! - Use the DXbot repository and full commit history when generating release
+  changelog entries.
+
 ## 0.11.9
 
 ## 0.11.8

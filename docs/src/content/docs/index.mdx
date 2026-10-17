@@ -1,25 +1,33 @@
 ---
-title: agent-wechat
-description: A programmable WeChat interface for AI agents and automation.
+title: DXbot
+description: Self-hosted WeChat and Douyin messaging automation powered by OpenClaw.
 template: splash
 hero:
-  tagline: Control WeChat from your AI agent, CLI, or custom code. Send and receive messages, list chats, download media — all via API.
+  tagline: Connect WeChat and Douyin to your models, rules, and conversation context through OpenClaw.
   actions:
-    - text: Get Started
-      link: /agent-wechat/getting-started/quickstart/
+    - text: Deployment Guide
+      link: https://github.com/ydxfkbg1630/DXbot/blob/main/docs/DEPLOYMENT.md
       icon: right-arrow
       variant: primary
     - text: View on GitHub
-      link: https://github.com/thisnick/agent-wechat
+      link: https://github.com/ydxfkbg1630/DXbot
       icon: external
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
+The reference sections document the inherited agent-wechat foundation.
+Use the DXbot deployment and Douyin bridge guides below for this repository's
+current integration setup.
+
 <CardGrid>
-  <Card title="Quick Start" icon="rocket">
-    Get agent-wechat running in under 5 minutes with the CLI.
-    [Get started →](/getting-started/quickstart/)
+  <Card title="WeChat Deployment" icon="rocket">
+    Build the service, align deployment helpers, and connect your OpenClaw gateway.
+    [Deployment guide](https://github.com/ydxfkbg1630/DXbot/blob/main/docs/DEPLOYMENT.md)
+  </Card>
+  <Card title="Douyin Bridge" icon="terminal">
+    Configure selected friends, browser login, and private-message text replies.
+    [Bridge setup](https://github.com/ydxfkbg1630/DXbot/blob/main/integrations/douyin/README.md)
   </Card>
   <Card title="OpenClaw Integration" icon="puzzle">
     Add WeChat as a channel in your OpenClaw AI agent.
@@ -30,7 +38,15 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     [View commands →](/getting-started/cli/commands/)
   </Card>
   <Card title="Architecture" icon="setting">
-    How agent-wechat works under the hood.
+    The upstream WeChat service architecture and its client control flow.
     [Learn more →](/how-it-works/architecture/)
   </Card>
 </CardGrid>
+
+## License Scopes
+
+DXbot-owned original contributions use AGPL-3.0-only. The Douyin directory
+retains PolyForm Noncommercial 1.0.0. Inherited WeChat material and third-party
+components retain their own rights and authorization requirements.
+
+[Scope and provenance](https://github.com/ydxfkbg1630/DXbot/blob/main/LICENSING.md)

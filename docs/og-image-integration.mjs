@@ -64,7 +64,7 @@ function ogTemplate(title, description, isRoot = false) {
                     marginBottom: isRoot ? '24px' : '12px',
                     fontFamily: 'DejaVu Sans',
                   },
-                  children: isRoot ? title : 'agent-wechat',
+                  children: isRoot ? title : 'DXbot',
                 },
               },
               // Non-root: page title as H2
@@ -126,7 +126,7 @@ function ogTemplate(title, description, isRoot = false) {
                     color: '#444444',
                     fontFamily: 'DejaVu Sans Mono',
                   },
-                  children: 'agent-wechat',
+                  children: 'DXbot',
                 },
               },
               {
@@ -237,8 +237,8 @@ export function ogImage() {
           statSync(fallbackPath);
         } catch {
           const png = await renderOgImage(
-            'agent-wechat',
-            'Programmable WeChat for AI agents.',
+            'DXbot',
+            'WeChat and Douyin automation with OpenClaw.',
             true
           );
           await sharp(png).toFile(fallbackPath);

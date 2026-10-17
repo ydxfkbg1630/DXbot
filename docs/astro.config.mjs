@@ -3,8 +3,8 @@ import starlight from '@astrojs/starlight';
 import { remarkBasePath } from './remark-base-path.mjs';
 import { ogImage } from './og-image-integration.mjs';
 
-const base = '/agent-wechat';
-const site = 'https://thisnick.github.io';
+const base = '/DXbot';
+const site = 'https://ydxfkbg1630.github.io';
 
 export default defineConfig({
   site,
@@ -15,14 +15,14 @@ export default defineConfig({
   integrations: [
     ogImage(),
     starlight({
-      title: 'agent-wechat',
-      description: 'A programmable WeChat interface for AI agents and automation.',
+      title: 'DXbot',
+      description: 'Self-hosted WeChat and Douyin messaging automation powered by OpenClaw.',
       customCss: ['./src/styles/custom.css'],
       components: {
         Head: './src/components/Head.astro',
       },
       social: {
-        github: 'https://github.com/thisnick/agent-wechat',
+        github: 'https://github.com/ydxfkbg1630/DXbot',
       },
       sidebar: [
         {

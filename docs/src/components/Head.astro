@@ -3,7 +3,7 @@ import Default from '@astrojs/starlight/components/Head.astro';
 
 const { entry } = Astro.locals.starlightRoute;
 const slug = entry.id.replace(/\.(md|mdx)$/, '').replace(/\/index$/, '') || 'index';
-const ogImagePath = `/agent-wechat/og/${slug}.png`;
+const ogImagePath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/og/${slug}.png`;
 const ogImageUrl = Astro.site ? new URL(ogImagePath, Astro.site).href : ogImagePath;
 ---
 
